@@ -17,7 +17,7 @@ from setuptools import setup
 
 setup(
     name="dag_test_utils",
-    version="0.0.1",
+    version="1.0.0",
     url="git@github.com:GoogleCloudPlatform/python-docs-samples.git#egg=dag_test_utils&subdirectory=composer/dag_test_utils",
     author="Google Cloud Platform",
     description="Utility used to unit test example Apache Airflow DAGs",
