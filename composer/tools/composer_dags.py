@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2022 Google LLC.
+# Copyright 2025 Google LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,10 @@ class DAG:
     """Provides necessary utils for Composer DAGs."""
 
     COMPOSER_AF_VERSION_RE = re.compile(
-        "composer-([0-9]+).([0-9]+).([0-9]+).*" "-airflow-([0-9]+).([0-9]+).([0-9]+).*"
+        "composer-([0-9]+).([0-9]+).([0-9]+).*-airflow-([0-9]+).([0-9]+).([0-9]+).*"
+    )
+    COMPOSER_3_AF_VERSION_RE = re.compile(
+        "composer-3-airflow-([0-9]+).([0-9]+).([0-9]+).*"
     )
 
     @staticmethod
@@ -93,7 +96,7 @@ class DAG:
         location: str,
         sdk_endpoint: str,
         dag_id: str,
-        airflow_version: list[int],
+        airflow_version: tuple[int, int, int],
     ) -> str:
         """Pause specific DAG in the given environment."""
         sub_command = "pause" if airflow_version < (2, 0, 0) else "dags pause"
@@ -118,7 +121,7 @@ class DAG:
         location: str,
         sdk_endpoint: str,
         dag_id: str,
-        airflow_version: list[int],
+        airflow_version: tuple[int, int, int],
     ) -> str:
         """UnPause specific DAG in the given environment."""
         sub_command = "unpause" if airflow_version < (2, 0, 0) else "dags unpause"
@@ -152,6 +155,21 @@ class DAG:
         return environment_json
 
 
+def extract_airflow_version_from_composer_image_version(
+    image_version: str,
+) -> tuple[int, int, int]:
+    match_result_c3 = DAG.COMPOSER_3_AF_VERSION_RE.match(image_version)
+    match_result = DAG.COMPOSER_AF_VERSION_RE.match(image_version)
+    if match_result_c3:
+        af1, af2, af3 = match_result_c3.groups()
+        return (int(af1), int(af2), int(af3))
+    elif match_result:
+        _, _, _, af1, af2, af3 = match_result.groups()
+        return (int(af1), int(af2), int(af3))
+    else:
+        raise Exception(f'Image version "{image_version}" can not be parsed.')
+
+
 def main(
     project_name: str, environment: str, location: str, operation: str, sdk_endpoint=str
 ) -> int:
@@ -162,14 +180,12 @@ def main(
         location=location,
         sdk_endpoint=sdk_endpoint,
     )
-    versions = DAG.COMPOSER_AF_VERSION_RE.match(
-        environment_info["config"]["softwareConfig"]["imageVersion"]
-    ).groups()
+    image_version = environment_info["config"]["softwareConfig"]["imageVersion"]
     logger.info(
         "Image version: %s",
-        environment_info["config"]["softwareConfig"]["imageVersion"],
+        image_version,
     )
-    airflow_version = (int(versions[3]), int(versions[4]), int(versions[5]))
+    airflow_version = extract_airflow_version_from_composer_image_version(image_version)
     list_of_dags = DAG.get_list_of_dags(
         project_name=project_name,
         environment=environment,
